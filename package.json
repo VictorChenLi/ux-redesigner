@@ -1,0 +1,35 @@
+{
+  "name": "clear-ui-redesigner",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "lucide-react": "^0.263.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.27",
+    "tailwindcss": "^3.3.3",
+    "vite": "^4.4.5",
+    "tsx": "^4.7.0"
+  },
+  "deployConfig": {
+    "gcpProject": "ai-ac-470019",
+    "cloudRunService": "clear-ui-redesigner",
+    "region": "us-central1",
+    "image": "gcr.io/ai-ac-470019/clear-ui-redesigner"
+  },
+  "scripts": {
+    "deploy": "tsx scripts/deploy.ts",
+    "deploy:raw": "gcloud config set project ai-ac-470019 && gcloud builds submit --tag gcr.io/ai-ac-470019/clear-ui-redesigner --quiet && gcloud run deploy clear-ui-redesigner --image gcr.io/ai-ac-470019/clear-ui-redesigner --platform managed --region us-central1 --allow-unauthenticated --quiet",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}
