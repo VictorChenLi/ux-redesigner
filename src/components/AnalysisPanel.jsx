@@ -14,7 +14,7 @@ export default function AnalysisPanel({ analysisResult, isAnalyzing }) {
 
       <div className="p-6 overflow-y-auto custom-scrollbar flex-1 relative">
         {analysisResult ? (
-          <div className="prose prose-sm prose-slate max-w-none">
+          <div className="prose prose-sm prose-slate max-w-none -mt-2">
             <MarkdownRenderer content={analysisResult} />
           </div>
         ) : (
@@ -24,7 +24,7 @@ export default function AnalysisPanel({ analysisResult, isAnalyzing }) {
                 <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-3">
                   <Eye className="w-6 h-6" />
                 </div>
-                <p className="font-medium text-slate-600">Analyzing C.L.E.A.R. metrics...</p>
+                <p className="font-medium text-slate-600">Analyzing C.L.E.A.R. framework...</p>
                 <p className="text-sm mt-1">This usually takes about 10-15 seconds</p>
               </div>
             ) : (

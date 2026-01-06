@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HeaderBar from './components/HeaderBar.jsx';
 import UploadCard from './components/UploadCard.jsx';
 import AnalysisPanel from './components/AnalysisPanel.jsx';
@@ -7,8 +7,18 @@ import RefinementBar from './components/RefinementBar.jsx';
 import ApiKeyModal from './components/ApiKeyModal.jsx';
 import useClearAi from './hooks/useClearAi.js';
 
+const API_KEY_STORAGE_KEY = 'clear-redesigner-api-key';
+
 export default function App() {
-  const [apiKey, setApiKey] = useState('');
+  // Load API key from localStorage on mount
+  const [apiKey, setApiKey] = useState(() => {
+    try {
+      return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
+    } catch (error) {
+      console.error('Failed to load API key from localStorage:', error);
+      return '';
+    }
+  });
   const [modelId, setModelId] = useState('gemini-3-flash-preview'); 
   const [customModelId, setCustomModelId] = useState('');
   const [imageFile, setImageFile] = useState(null);
@@ -21,6 +31,8 @@ export default function App() {
 
   const {
     isAnalyzing,
+    isRound1Analyzing,
+    isRound2Generating,
     isRefining,
     analysisResult,
     generatedCode,
@@ -50,6 +62,17 @@ export default function App() {
 
   const runAnalyze = () =>
     analyze({ apiKey, modelId, customModelId, imageFile, userContext });
+
+  // Save API key to localStorage whenever it changes
+  useEffect(() => {
+    if (apiKey) {
+      try {
+        localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+      } catch (error) {
+        console.error('Failed to save API key to localStorage:', error);
+      }
+    }
+  }, [apiKey]);
 
   const handleAnalyze = () => {
     if (!apiKey) {
@@ -95,7 +118,7 @@ export default function App() {
 
           <AnalysisPanel
             analysisResult={analysisResult}
-            isAnalyzing={isAnalyzing}
+            isAnalyzing={isRound1Analyzing}
           />
         </div>
 
@@ -104,7 +127,7 @@ export default function App() {
             generatedCode={generatedCode}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            isAnalyzing={isAnalyzing}
+            isAnalyzing={isRound2Generating}
           />
 
           <RefinementBar
