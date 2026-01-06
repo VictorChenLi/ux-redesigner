@@ -41,22 +41,22 @@ const ANALYSIS_PROMPT = `
   
   OUTPUT FORMAT:
   - Start with: "Overall Score: XX%" (where XX is a number from 0-100)
-  - Provide the C.L.E.A.R. analysis in Markdown format.
-  - Use proper Markdown headers: ## C - Copywriting, ## L - Layout, ## E - Emphasis, ## A - Accessibility, ## R - Reward (use ## for level 2 headers, not ####)
-  - Under EACH module section, include:
-    1. Status line: "Status: [Critical Issue | Needs Improvement | Pass]" (on the first line after the header)
-    2. Detailed critique points as bullet points (e.g., • Clear Benefit: ..., • Friction: ..., • Feedback: ..., etc.)
-    3. At the end of EACH module, you MUST add: • Redesign Suggestion: [concrete, actionable redesign recommendation specifically for this C.L.E.A.R. module]
-  - CRITICAL: Every module (C, L, E, A, R) must have a Status line and end with a "• Redesign Suggestion:" bullet point. Do not skip this for any module.
-  - Example format for R - Reward:
-    ## R - Reward
-    Status: Pass
-    • Friction: [analysis]
-    • Feedback: [analysis]
-    • Redesign Suggestion: [specific recommendation for Reward module]
-  - Apply this exact same format to ALL modules (C, L, E, A, R) - each must have its status, critique points, and a Redesign Suggestion.
-  - Do NOT include any HTML code in this response.
-  - Do NOT create a separate "Redesign" section. All redesign suggestions must be under their respective C.L.E.A.R. modules.
+  - Provide the C.L.E.A.R. analysis in Markdown format using ## headers (not ####)
+  - For EACH module (C, L, E, A, R), follow this structure:
+    1. Module header: ## C - Copywriting (or L - Layout, E - Emphasis, A - Accessibility, R - Reward)
+    2. Status line (first line after header): "Status: [Critical Issue | Needs Improvement | Pass]"
+    3. Critique bullet points with BOLD labels and detailed analysis:
+       - Format: • **Label:** [comprehensive analysis explaining the issue, observation, or finding]
+       - Each bullet must use bold markdown (**text**) for the label, followed by a colon and detailed analysis
+       - Module-specific labels:
+         * C - Copywriting: **Clear Benefit:**, **Concise Copy:**, **Concrete Claims:**, **Action Labels:**, **Risk Reassure:**, **Remove Fluff:**, **Human Voice:**
+         * L - Layout: **Proximity:**, **Similarity:**, **Alignment:**, **Common Region:**, **Continuity:**, **Simplicity:**, **Clear Zones:**
+         * E - Emphasis: **Focal Point:**, **Hierarchy:**, **Visual Weight:**, etc.
+         * A - Accessibility: **Contrast:**, **Touch Targets:**, **Readability:**, **Color Blindness:**, etc.
+         * R - Reward: **Friction:**, **Feedback:**, **User Delight:**, etc.
+    4. Final bullet point: • **Redesign Suggestion:** [concrete, actionable recommendation for this specific module]
+  - CRITICAL: Every module must include Status, critique points with bold labels, and a Redesign Suggestion. Do not skip any module.
+  - Do NOT include HTML code or create a separate "Redesign" section. All redesign suggestions belong under their respective C.L.E.A.R. modules.
 `;
 
 const CODE_GENERATION_PROMPT = (analysisResult, userContext) => `
@@ -88,6 +88,11 @@ const CODE_GENERATION_PROMPT = (analysisResult, userContext) => `
 // Helper function to determine if a model is OpenAI
 const isOpenAIModel = (modelId) => {
   return modelId.startsWith('gpt-') || modelId.startsWith('o1-') || modelId.startsWith('o3-');
+};
+
+// Helper function to check if a model is GPT-5 series (requires max_completion_tokens instead of max_tokens)
+const isGPT5Model = (modelId) => {
+  return modelId.startsWith('gpt-5');
 };
 
 // Helper function to get the appropriate API endpoint
@@ -139,6 +144,28 @@ async function fileToGenerativePart(file) {
   };
 }
 
+// Convert file to OpenAI format (base64 data URL)
+async function fileToOpenAIImageUrl(file) {
+  if (!file) {
+    throw new Error('Please add an image first (drag/drop or choose a file).');
+  }
+
+  const data = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        return reject(new Error('Unable to read image data.'));
+      }
+      resolve(result); // Return full data URL for OpenAI
+    };
+    reader.onerror = () => reject(new Error('Failed to read image file.'));
+    reader.readAsDataURL(file);
+  });
+
+  return data;
+}
+
 function extractHtmlAndAnalysis(textResponse) {
   const htmlMatch = textResponse.match(/```html([\s\S]*?)```/);
   if (htmlMatch && htmlMatch[1]) {
@@ -188,6 +215,8 @@ export default function useClearAi() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         };
+        const isGPT5 = isGPT5Model(targetModel);
+        // GPT-5 models support up to 128,000 output tokens
         payload = {
           model: targetModel,
           messages: [
@@ -202,7 +231,7 @@ export default function useClearAi() {
               ],
             },
           ],
-          max_tokens: 8192,
+          ...(isGPT5 ? { max_completion_tokens: 32000 } : { max_tokens: 8192 }),
           temperature: 0.4,
         };
       } else {
@@ -210,23 +239,31 @@ export default function useClearAi() {
         endpoint = getModelEndpoint(targetModel, apiKey);
         headers = { 'Content-Type': 'application/json' };
         payload = {
-          contents: [{ parts: [{ text: fullPrompt }, imagePart] }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 8192,
-          },
-        };
+        contents: [{ parts: [{ text: fullPrompt }, imagePart] }],
+        generationConfig: {
+          temperature: 0.4,
+          maxOutputTokens: 8192,
+        },
+      };
       }
 
-      console.log('[DEBUG] Round 1: Sending API request...');
+      console.log('[DEBUG] Round 1: Sending API request...', { endpoint, model: targetModel });
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}: ${response.statusText}` } }));
+        const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
+        throw new Error(`Model "${targetModel}": ${errorMessage}`);
+      }
+
       const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
+      if (data.error) {
+        throw new Error(`Model "${targetModel}": ${data.error.message}`);
+      }
       
       let analysisText;
       if (isOpenAI) {
@@ -277,6 +314,8 @@ export default function useClearAi() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         };
+        const isGPT5 = isGPT5Model(targetModel);
+        // GPT-5 models support up to 128,000 output tokens, use a higher limit for code generation
         payload = {
           model: targetModel,
           messages: [
@@ -285,7 +324,7 @@ export default function useClearAi() {
               content: fullPrompt,
             },
           ],
-          max_tokens: 8192,
+          ...(isGPT5 ? { max_completion_tokens: 32000 } : { max_tokens: 8192 }),
           temperature: 0.4,
         };
       } else {
@@ -300,20 +339,56 @@ export default function useClearAi() {
         };
       }
 
-      console.log('[DEBUG] Round 2: Sending API request...');
+      console.log('[DEBUG] Round 2: Sending API request...', { endpoint, model: targetModel });
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}: ${response.statusText}` } }));
+        const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
+        throw new Error(`Model "${targetModel}": ${errorMessage}`);
+      }
+
       const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
+      if (data.error) {
+        throw new Error(`Model "${targetModel}": ${data.error.message}`);
+      }
+      
+      console.log('[DEBUG] Round 2: API response structure:', JSON.stringify(data, null, 2).substring(0, 500));
       
       let textResponse;
       if (isOpenAI) {
-        if (!data.choices?.[0]?.message?.content) throw new Error('No code generated.');
-        textResponse = data.choices[0].message.content;
+        const choice = data.choices?.[0];
+        const finishReason = choice?.finish_reason;
+        
+        // Check for different possible response structures
+        if (choice?.message?.content) {
+          textResponse = choice.message.content;
+        } else if (data.choices?.[0]?.delta?.content) {
+          // Streaming response format
+          textResponse = data.choices[0].delta.content;
+        } else if (data.content) {
+          // Direct content field
+          textResponse = data.content;
+        } else {
+          // Handle truncated responses
+          if (finishReason === 'length') {
+            throw new Error(`Response was truncated due to token limit. The generated code may be incomplete. Try reducing the analysis length or increase max_completion_tokens.`);
+          }
+          console.error('[DEBUG] Round 2: Unexpected response structure:', data);
+          throw new Error(`No code generated. Finish reason: ${finishReason || 'unknown'}. Response structure: ${JSON.stringify(data).substring(0, 200)}`);
+        }
+        
+        // Check if content is empty
+        if (!textResponse || textResponse.trim() === '') {
+          if (finishReason === 'length') {
+            throw new Error(`Response was truncated due to token limit. The generated code may be incomplete. Try reducing the analysis length or increase max_completion_tokens.`);
+          }
+          throw new Error(`No code generated. Finish reason: ${finishReason || 'unknown'}`);
+        }
       } else {
         if (!data.candidates?.[0]?.content) throw new Error('No code generated.');
         textResponse = data.candidates[0].content.parts[0].text;
@@ -331,7 +406,7 @@ export default function useClearAi() {
         // Fallback: if HTML is present but not wrapped in code block
         const code = textResponse.trim();
         console.log('[DEBUG] Round 2: Calling setGeneratedCode (fallback), code length:', code.length);
-        setGeneratedCode(code);
+      setGeneratedCode(code);
         return code;
       } else {
         throw new Error('Could not parse HTML from response.');
@@ -512,6 +587,8 @@ export default function useClearAi() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
         };
+        const isGPT5 = isGPT5Model(targetModel);
+        // GPT-5 models support up to 128,000 output tokens
         payload = {
           model: targetModel,
           messages: [
@@ -520,7 +597,7 @@ export default function useClearAi() {
               content: refinePrompt,
             },
           ],
-          max_tokens: 8192,
+          ...(isGPT5 ? { max_completion_tokens: 32000 } : { max_tokens: 8192 }),
           temperature: 0.4,
         };
       } else {
@@ -532,11 +609,11 @@ export default function useClearAi() {
               parts: [
                 {
                   text: refinePrompt,
-                },
-              ],
-            },
-          ],
-        };
+              },
+            ],
+          },
+        ],
+      };
       }
 
       const response = await fetch(endpoint, {
@@ -545,8 +622,16 @@ export default function useClearAi() {
         body: JSON.stringify(payload),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}: ${response.statusText}` } }));
+        const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
+        throw new Error(`Model "${targetModel}": ${errorMessage}`);
+      }
+
       const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
+      if (data.error) {
+        throw new Error(`Model "${targetModel}": ${data.error.message}`);
+      }
 
       let textResponse;
       if (isOpenAI) {
