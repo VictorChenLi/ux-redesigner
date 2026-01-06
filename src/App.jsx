@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import HeaderBar from './components/HeaderBar.jsx';
+import ModelKeySettings from './components/ModelKeySettings.jsx';
 import UploadCard from './components/UploadCard.jsx';
 import AnalysisPanel from './components/AnalysisPanel.jsx';
 import PreviewPanel from './components/PreviewPanel.jsx';
@@ -7,20 +8,49 @@ import RefinementBar from './components/RefinementBar.jsx';
 import ApiKeyModal from './components/ApiKeyModal.jsx';
 import useClearAi from './hooks/useClearAi.js';
 
-const API_KEY_STORAGE_KEY = 'clear-redesigner-api-key';
+const API_KEYS_STORAGE_KEY = 'clear-redesigner-api-keys'; // { modelId: apiKey }
+const MODEL_ID_STORAGE_KEY = 'clear-redesigner-model-id';
+const CUSTOM_MODEL_ID_STORAGE_KEY = 'clear-redesigner-custom-model-id';
+
+// Helper to get the actual model ID (handles custom models)
+const getActualModelId = (modelId, customModelId) => {
+  return modelId === 'custom' ? customModelId : modelId;
+};
 
 export default function App() {
-  // Load API key from localStorage on mount
+  // Load model selection from localStorage on mount
+  const [modelId, setModelId] = useState(() => {
+    try {
+      return localStorage.getItem(MODEL_ID_STORAGE_KEY) || 'gemini-3-flash-preview';
+    } catch (error) {
+      console.error('Failed to load model ID from localStorage:', error);
+      return 'gemini-3-flash-preview';
+    }
+  });
+  
+  const [customModelId, setCustomModelId] = useState(() => {
+    try {
+      return localStorage.getItem(CUSTOM_MODEL_ID_STORAGE_KEY) || '';
+    } catch (error) {
+      console.error('Failed to load custom model ID from localStorage:', error);
+      return '';
+    }
+  });
+
+  // Load API key for the selected model
   const [apiKey, setApiKey] = useState(() => {
     try {
-      return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
+      const storedKeys = JSON.parse(localStorage.getItem(API_KEYS_STORAGE_KEY) || '{}');
+      const initialModelId = localStorage.getItem(MODEL_ID_STORAGE_KEY) || 'gemini-3-flash-preview';
+      const initialCustomModelId = localStorage.getItem(CUSTOM_MODEL_ID_STORAGE_KEY) || '';
+      const actualModelId = initialModelId === 'custom' ? initialCustomModelId : initialModelId;
+      return actualModelId ? (storedKeys[actualModelId] || '') : '';
     } catch (error) {
       console.error('Failed to load API key from localStorage:', error);
       return '';
     }
   });
-  const [modelId, setModelId] = useState('gemini-3-flash-preview'); 
-  const [customModelId, setCustomModelId] = useState('');
+
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [userContext, setUserContext] = useState(''); 
@@ -63,16 +93,35 @@ export default function App() {
   const runAnalyze = () =>
     analyze({ apiKey, modelId, customModelId, imageFile, userContext });
 
-  // Save API key to localStorage whenever it changes
+  // Load API key when model changes
   useEffect(() => {
-    if (apiKey) {
-      try {
-        localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
-      } catch (error) {
-        console.error('Failed to save API key to localStorage:', error);
-      }
+    try {
+      const storedKeys = JSON.parse(localStorage.getItem(API_KEYS_STORAGE_KEY) || '{}');
+      const actualModelId = getActualModelId(modelId, customModelId);
+      const keyForModel = actualModelId ? (storedKeys[actualModelId] || '') : '';
+      setApiKey(keyForModel);
+    } catch (error) {
+      console.error('Failed to load API key for model:', error);
     }
-  }, [apiKey]);
+  }, [modelId, customModelId]);
+
+  // Save model selection to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(MODEL_ID_STORAGE_KEY, modelId);
+    } catch (error) {
+      console.error('Failed to save model ID to localStorage:', error);
+    }
+  }, [modelId]);
+
+  // Save custom model ID to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(CUSTOM_MODEL_ID_STORAGE_KEY, customModelId);
+    } catch (error) {
+      console.error('Failed to save custom model ID to localStorage:', error);
+    }
+  }, [customModelId]);
 
   const handleAnalyze = () => {
     if (!apiKey) {
@@ -93,14 +142,21 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
       <HeaderBar
-        apiKey={apiKey}
-        onApiKeyChange={setApiKey}
-        showSettings={showSettings}
         onToggleSettings={() => setShowSettings((prev) => !prev)}
+        modelId={modelId}
+        customModelId={customModelId}
+        apiKey={apiKey}
+      />
+
+      <ModelKeySettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
         modelId={modelId}
         onModelIdChange={setModelId}
         customModelId={customModelId}
-        onCustomModelChange={setCustomModelId}
+        onCustomModelIdChange={setCustomModelId}
+        apiKey={apiKey}
+        onApiKeyChange={setApiKey}
       />
 
       <main className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">

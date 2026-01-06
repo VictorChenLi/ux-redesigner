@@ -1,16 +1,36 @@
 import React from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Check, X } from 'lucide-react';
+
+// Helper to get display name for model
+const getModelDisplayName = (modelId, customModelId) => {
+  if (modelId === 'custom') {
+    return customModelId || 'Custom Model';
+  }
+  
+  const modelNames = {
+    'gemini-3-flash-preview': 'Gemini 3 Flash',
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite',
+    'gemini-3-pro-preview': 'Gemini 3 Pro',
+    'gpt-5.2': 'GPT-5.2',
+    'gpt-5.1': 'GPT-5.1',
+    'gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
+    'gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
+    'gpt-5-nano': 'GPT-5 Nano',
+  };
+  
+  return modelNames[modelId] || modelId;
+};
 
 export default function HeaderBar({
-  apiKey,
-  onApiKeyChange,
-  showSettings,
   onToggleSettings,
   modelId,
-  onModelIdChange,
   customModelId,
-  onCustomModelChange,
+  apiKey,
 }) {
+  const modelDisplayName = getModelDisplayName(modelId, customModelId);
+  const hasApiKey = !!apiKey && apiKey.trim() !== '';
+
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -39,90 +59,26 @@ export default function HeaderBar({
           </a>
         </div>
         <div className="flex items-center space-x-2 md:space-x-4">
-          <div className="relative group">
-            <button
-              onClick={onToggleSettings}
-              className={`p-2 rounded-full transition-colors ${
-                showSettings ? 'bg-blue-100 text-blue-600' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-100'
-              }`}
-              title="Model Settings"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <input
-              type="password"
-              placeholder="Enter API Key"
-              className="px-3 py-1.5 text-sm border border-slate-300 rounded-md w-40 md:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={apiKey}
-              onChange={(e) => onApiKeyChange(e.target.value)}
-            />
-            <div className="flex items-center space-x-1">
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs md:text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-md px-2.5 py-1.5 transition-colors"
-              >
-                Get Gemini key
-              </a>
-              <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs md:text-sm font-medium text-green-600 hover:text-green-700 border border-green-200 hover:border-green-300 bg-green-50 hover:bg-green-100 rounded-md px-2.5 py-1.5 transition-colors"
-              >
-                Get OpenAI key
-              </a>
+          {/* Model & API Key Status Pill - Clickable */}
+          <button
+            onClick={onToggleSettings}
+            className="flex items-center space-x-2 px-3 py-1.5 bg-slate-100 rounded-full border border-slate-200 hover:bg-slate-200 hover:border-slate-300 transition-colors group"
+            title="Click to configure model & API key"
+          >
+            <span className="text-sm font-medium text-slate-700 truncate max-w-[120px] md:max-w-[200px]">
+              {modelDisplayName}
+            </span>
+            <div className="flex items-center">
+              {hasApiKey ? (
+                <Check className="w-4 h-4 text-green-600" title="API Key configured" />
+              ) : (
+                <X className="w-4 h-4 text-red-500" title="API Key missing" />
+              )}
             </div>
-          </div>
+            <Settings className="w-4 h-4 text-slate-500 group-hover:text-blue-600 transition-colors" />
+          </button>
         </div>
       </div>
-
-      {showSettings && (
-        <div className="bg-slate-100 border-b border-slate-200 p-4 animate-in slide-in-from-top-2">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-6 text-sm">
-            <span className="font-semibold text-slate-700">Model Configuration:</span>
-            <div className="flex items-center space-x-2">
-              <label className="text-slate-600">Select Model:</label>
-              <select
-                value={modelId}
-                onChange={(e) => onModelIdChange(e.target.value)}
-                className="p-1 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none min-w-[200px]"
-              >
-                <optgroup label="Google Gemini (Free with limits)">
-                  <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Default) - Free</option>
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash - Free</option>
-                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite - Free</option>
-                </optgroup>
-                <optgroup label="Google Gemini (Paid)">
-                  <option value="gemini-3-pro-preview">Gemini 3 Pro Preview - Paid</option>
-                </optgroup>
-                <optgroup label="OpenAI GPT-5 Series (Paid)">
-                  <option value="gpt-5.2">GPT-5.2 - Paid</option>
-                  <option value="gpt-5.1">GPT-5.1 - Paid</option>
-                  <option value="gpt-5.1-codex-max">GPT-5.1 Codex Max - Paid</option>
-                  <option value="gpt-5.1-codex-mini">GPT-5.1 Codex Mini - Paid</option>
-                  <option value="gpt-5-nano">GPT-5 Nano - Paid</option>
-                </optgroup>
-                <option value="custom">Custom Model ID...</option>
-              </select>
-            </div>
-
-            {modelId === 'custom' && (
-              <input
-                type="text"
-                placeholder="e.g. gemini-2.0-flash-exp or gpt-4"
-                value={customModelId}
-                onChange={(e) => onCustomModelChange(e.target.value)}
-                className="p-1 border border-slate-300 rounded w-48 focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            )}
-          </div>
-        </div>
-      )}
     </header>
   );
 }
