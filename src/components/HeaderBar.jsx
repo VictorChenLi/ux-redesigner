@@ -54,19 +54,29 @@ export default function HeaderBar({
           <div className="flex items-center space-x-2">
             <input
               type="password"
-              placeholder="Enter Gemini API Key"
+              placeholder="Enter API Key"
               className="px-3 py-1.5 text-sm border border-slate-300 rounded-md w-40 md:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={apiKey}
               onChange={(e) => onApiKeyChange(e.target.value)}
             />
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs md:text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-md px-2.5 py-1.5 transition-colors"
-            >
-              Get Gemini key
-            </a>
+            <div className="flex items-center space-x-1">
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs md:text-sm font-medium text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 bg-blue-50 hover:bg-blue-100 rounded-md px-2.5 py-1.5 transition-colors"
+              >
+                Get Gemini key
+              </a>
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs md:text-sm font-medium text-green-600 hover:text-green-700 border border-green-200 hover:border-green-300 bg-green-50 hover:bg-green-100 rounded-md px-2.5 py-1.5 transition-colors"
+              >
+                Get OpenAI key
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -80,10 +90,23 @@ export default function HeaderBar({
               <select
                 value={modelId}
                 onChange={(e) => onModelIdChange(e.target.value)}
-                className="p-1 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                className="p-1 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none min-w-[200px]"
               >
-                <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Default)</option>
-                <option value="gemini-3-pro-preview">Gemini 3 Pro Preview</option>
+                <optgroup label="Google Gemini (Free with limits)">
+                  <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Default) - Free</option>
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash - Free</option>
+                  <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite - Free</option>
+                </optgroup>
+                <optgroup label="Google Gemini (Paid)">
+                  <option value="gemini-3-pro-preview">Gemini 3 Pro Preview - Paid</option>
+                </optgroup>
+                <optgroup label="OpenAI GPT-5 Series (Paid)">
+                  <option value="gpt-5.2">GPT-5.2 - Paid</option>
+                  <option value="gpt-5.1">GPT-5.1 - Paid</option>
+                  <option value="gpt-5.1-codex-max">GPT-5.1 Codex Max - Paid</option>
+                  <option value="gpt-5.1-codex-mini">GPT-5.1 Codex Mini - Paid</option>
+                  <option value="gpt-5-nano">GPT-5 Nano - Paid</option>
+                </optgroup>
                 <option value="custom">Custom Model ID...</option>
               </select>
             </div>
@@ -91,7 +114,7 @@ export default function HeaderBar({
             {modelId === 'custom' && (
               <input
                 type="text"
-                placeholder="e.g. gemini-2.0-flash-exp"
+                placeholder="e.g. gemini-2.0-flash-exp or gpt-4"
                 value={customModelId}
                 onChange={(e) => onCustomModelChange(e.target.value)}
                 className="p-1 border border-slate-300 rounded w-48 focus:ring-2 focus:ring-blue-500 outline-none"
