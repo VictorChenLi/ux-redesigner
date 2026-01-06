@@ -1,15 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { isOpenAIModel } from '../utils/modelHandlers.js';
 
 const API_KEYS_STORAGE_KEY = 'clear-redesigner-api-keys'; // Store as { modelId: apiKey }
-
-// Helper to determine provider
-const getProvider = (modelId) => {
-  if (modelId.startsWith('gpt-') || modelId.startsWith('o1-') || modelId.startsWith('o3-')) {
-    return 'openai';
-  }
-  return 'gemini';
-};
 
 export default function ModelKeySettings({
   isOpen,
@@ -79,8 +72,7 @@ export default function ModelKeySettings({
   };
 
   const actualModelId = modelId === 'custom' ? customModelId : modelId;
-  const provider = getProvider(actualModelId || 'gemini-3-flash-preview');
-  const isGemini = provider === 'gemini';
+  const isGemini = !isOpenAIModel(actualModelId || 'gemini-3-flash-preview');
 
   if (!isOpen) return null;
 
@@ -130,9 +122,6 @@ export default function ModelKeySettings({
                 <optgroup label="OpenAI GPT-5 Series (Paid)">
                   <option value="gpt-5.2">GPT-5.2 - Paid</option>
                   <option value="gpt-5.1">GPT-5.1 - Paid</option>
-                  <option value="gpt-5.1-codex-max">GPT-5.1 Codex Max - Paid</option>
-                  <option value="gpt-5.1-codex-mini">GPT-5.1 Codex Mini - Paid</option>
-                  <option value="gpt-5-nano">GPT-5 Nano - Paid</option>
                 </optgroup>
                 <option value="custom">Custom Model ID...</option>
               </select>

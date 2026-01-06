@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { makeModelAPICall } from '../utils/modelHandlers.js';
 
 const ANALYSIS_PROMPT = `
   You are an expert UI/UX Designer. 
@@ -85,86 +86,6 @@ const CODE_GENERATION_PROMPT = (analysisResult, userContext) => `
   - Do not include any markdown or explanations outside the code block.
 `;
 
-// Helper function to determine if a model is OpenAI
-const isOpenAIModel = (modelId) => {
-  return modelId.startsWith('gpt-') || modelId.startsWith('o1-') || modelId.startsWith('o3-');
-};
-
-// Helper function to check if a model is GPT-5 series (requires max_completion_tokens instead of max_tokens)
-const isGPT5Model = (modelId) => {
-  return modelId.startsWith('gpt-5');
-};
-
-// Helper function to get the appropriate API endpoint
-const getModelEndpoint = (modelId, apiKey) => {
-  if (isOpenAIModel(modelId)) {
-    return 'https://api.openai.com/v1/chat/completions';
-  }
-  return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-};
-
-// Legacy function for backward compatibility
-const MODEL_ENDPOINT = (modelId, apiKey) => getModelEndpoint(modelId, apiKey);
-
-async function fileToGenerativePart(file) {
-  if (!file) {
-    throw new Error('Please add an image first (drag/drop or choose a file).');
-  }
-
-  const data = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== 'string') {
-        return reject(new Error('Unable to read image data.'));
-      }
-      const commaIndex = result.indexOf(',');
-      if (commaIndex === -1) {
-        return reject(new Error('Unable to parse image data.'));
-      }
-      const base64 = result.slice(commaIndex + 1);
-      if (!base64) {
-        return reject(new Error('Image data is empty.'));
-      }
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error('Unable to read image. Please try another file.'));
-    reader.onabort = () => reject(new Error('Image read was aborted. Please retry.'));
-    try {
-      reader.readAsDataURL(file);
-    } catch (err) {
-      reject(new Error('Unable to read image. Please try another file.'));
-    }
-  });
-
-  const mimeType = typeof file.type === 'string' && file.type ? file.type : 'application/octet-stream';
-
-  return {
-    inlineData: { data, mimeType },
-  };
-}
-
-// Convert file to OpenAI format (base64 data URL)
-async function fileToOpenAIImageUrl(file) {
-  if (!file) {
-    throw new Error('Please add an image first (drag/drop or choose a file).');
-  }
-
-  const data = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result !== 'string') {
-        return reject(new Error('Unable to read image data.'));
-      }
-      resolve(result); // Return full data URL for OpenAI
-    };
-    reader.onerror = () => reject(new Error('Failed to read image file.'));
-    reader.readAsDataURL(file);
-  });
-
-  return data;
-}
 
 function extractHtmlAndAnalysis(textResponse) {
   const htmlMatch = textResponse.match(/```html([\s\S]*?)```/);
@@ -192,8 +113,6 @@ export default function useClearAi() {
     if (!apiKey) throw new Error('Please enter your API Key first.');
     if (!imageFile) throw new Error('Please upload an image to analyze.');
 
-    const targetModel = modelId === 'custom' ? customModelId : modelId;
-    const isOpenAI = isOpenAIModel(targetModel);
     console.log('[DEBUG] Round 1: Setting isRound1Analyzing = true');
     setIsRound1Analyzing(true);
     setError(null);
@@ -204,75 +123,14 @@ export default function useClearAi() {
         fullPrompt += `\n\nADDITIONAL CONTEXT FROM USER:\n"${userContext.trim()}"\n\nPlease incorporate this context into your analysis.`;
       }
 
-      let payload;
-      let headers;
-      let endpoint;
-
-      if (isOpenAI) {
-        const imageUrl = await fileToOpenAIImageUrl(imageFile);
-        endpoint = getModelEndpoint(targetModel, apiKey);
-        headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        };
-        const isGPT5 = isGPT5Model(targetModel);
-        // GPT-5 models support up to 128,000 output tokens
-        payload = {
-          model: targetModel,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: fullPrompt },
-                {
-                  type: 'image_url',
-                  image_url: { url: imageUrl },
-                },
-              ],
-            },
-          ],
-          ...(isGPT5 ? { max_completion_tokens: 32000 } : { max_tokens: 8192 }),
-          temperature: 0.4,
-        };
-      } else {
-        const imagePart = await fileToGenerativePart(imageFile);
-        endpoint = getModelEndpoint(targetModel, apiKey);
-        headers = { 'Content-Type': 'application/json' };
-        payload = {
-        contents: [{ parts: [{ text: fullPrompt }, imagePart] }],
-        generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 8192,
-        },
-      };
-      }
-
-      console.log('[DEBUG] Round 1: Sending API request...', { endpoint, model: targetModel });
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
+      const analysisText = await makeModelAPICall({
+        modelId,
+        apiKey,
+        prompt: fullPrompt,
+        imageFile,
+        customModelId,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}: ${response.statusText}` } }));
-        const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
-        throw new Error(`Model "${targetModel}": ${errorMessage}`);
-      }
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(`Model "${targetModel}": ${data.error.message}`);
-      }
-      
-      let analysisText;
-      if (isOpenAI) {
-        if (!data.choices?.[0]?.message?.content) throw new Error('No analysis generated.');
-        analysisText = data.choices[0].message.content;
-      } else {
-        if (!data.candidates?.[0]?.content) throw new Error('No analysis generated.');
-        analysisText = data.candidates[0].content.parts[0].text;
-      }
       console.log('[DEBUG] Round 1: Received analysis response, length:', analysisText.length);
       console.log('[DEBUG] Round 1: Calling setRound1Analysis...');
       setRound1Analysis(analysisText);
@@ -295,8 +153,6 @@ export default function useClearAi() {
     if (!apiKey) throw new Error('Please enter your API Key first.');
     if (!analysisResult) throw new Error('Analysis result is required for code generation.');
 
-    const targetModel = modelId === 'custom' ? customModelId : modelId;
-    const isOpenAI = isOpenAIModel(targetModel);
     console.log('[DEBUG] Round 2: Setting isRound2Generating = true');
     setIsRound2Generating(true);
     setError(null);
@@ -304,95 +160,13 @@ export default function useClearAi() {
     try {
       const fullPrompt = CODE_GENERATION_PROMPT(analysisResult, userContext);
 
-      let payload;
-      let headers;
-      let endpoint;
-
-      if (isOpenAI) {
-        endpoint = getModelEndpoint(targetModel, apiKey);
-        headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        };
-        const isGPT5 = isGPT5Model(targetModel);
-        // GPT-5 models support up to 128,000 output tokens, use a higher limit for code generation
-        payload = {
-          model: targetModel,
-          messages: [
-            {
-              role: 'user',
-              content: fullPrompt,
-            },
-          ],
-          ...(isGPT5 ? { max_completion_tokens: 32000 } : { max_tokens: 8192 }),
-          temperature: 0.4,
-        };
-      } else {
-        endpoint = getModelEndpoint(targetModel, apiKey);
-        headers = { 'Content-Type': 'application/json' };
-        payload = {
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 8192,
-          },
-        };
-      }
-
-      console.log('[DEBUG] Round 2: Sending API request...', { endpoint, model: targetModel });
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
+      const textResponse = await makeModelAPICall({
+        modelId,
+        apiKey,
+        prompt: fullPrompt,
+        customModelId,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}: ${response.statusText}` } }));
-        const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
-        throw new Error(`Model "${targetModel}": ${errorMessage}`);
-      }
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(`Model "${targetModel}": ${data.error.message}`);
-      }
-      
-      console.log('[DEBUG] Round 2: API response structure:', JSON.stringify(data, null, 2).substring(0, 500));
-      
-      let textResponse;
-      if (isOpenAI) {
-        const choice = data.choices?.[0];
-        const finishReason = choice?.finish_reason;
-        
-        // Check for different possible response structures
-        if (choice?.message?.content) {
-          textResponse = choice.message.content;
-        } else if (data.choices?.[0]?.delta?.content) {
-          // Streaming response format
-          textResponse = data.choices[0].delta.content;
-        } else if (data.content) {
-          // Direct content field
-          textResponse = data.content;
-        } else {
-          // Handle truncated responses
-          if (finishReason === 'length') {
-            throw new Error(`Response was truncated due to token limit. The generated code may be incomplete. Try reducing the analysis length or increase max_completion_tokens.`);
-          }
-          console.error('[DEBUG] Round 2: Unexpected response structure:', data);
-          throw new Error(`No code generated. Finish reason: ${finishReason || 'unknown'}. Response structure: ${JSON.stringify(data).substring(0, 200)}`);
-        }
-        
-        // Check if content is empty
-        if (!textResponse || textResponse.trim() === '') {
-          if (finishReason === 'length') {
-            throw new Error(`Response was truncated due to token limit. The generated code may be incomplete. Try reducing the analysis length or increase max_completion_tokens.`);
-          }
-          throw new Error(`No code generated. Finish reason: ${finishReason || 'unknown'}`);
-        }
-      } else {
-        if (!data.candidates?.[0]?.content) throw new Error('No code generated.');
-        textResponse = data.candidates[0].content.parts[0].text;
-      }
       console.log('[DEBUG] Round 2: Received code response, length:', textResponse.length);
       const htmlMatch = textResponse.match(/```html([\s\S]*?)```/);
       
@@ -406,7 +180,7 @@ export default function useClearAi() {
         // Fallback: if HTML is present but not wrapped in code block
         const code = textResponse.trim();
         console.log('[DEBUG] Round 2: Calling setGeneratedCode (fallback), code length:', code.length);
-      setGeneratedCode(code);
+        setGeneratedCode(code);
         return code;
       } else {
         throw new Error('Could not parse HTML from response.');
@@ -559,8 +333,6 @@ export default function useClearAi() {
   const refine = async ({ apiKey, modelId, customModelId, generatedCode, prompt }) => {
     if (!apiKey || !generatedCode || !prompt?.trim()) return;
 
-    const targetModel = modelId === 'custom' ? customModelId : modelId;
-    const isOpenAI = isOpenAIModel(targetModel);
     setIsRefining(true);
     setError(null);
 
@@ -577,70 +349,13 @@ export default function useClearAi() {
                 Update the HTML code to satisfy the user request.
                 Return ONLY the raw HTML code wrapped in \`\`\`html ... \`\`\`. Do not include markdown or explanations outside the code block.`;
 
-      let payload;
-      let headers;
-      let endpoint;
-
-      if (isOpenAI) {
-        endpoint = getModelEndpoint(targetModel, apiKey);
-        headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        };
-        const isGPT5 = isGPT5Model(targetModel);
-        // GPT-5 models support up to 128,000 output tokens
-        payload = {
-          model: targetModel,
-          messages: [
-            {
-              role: 'user',
-              content: refinePrompt,
-            },
-          ],
-          ...(isGPT5 ? { max_completion_tokens: 32000 } : { max_tokens: 8192 }),
-          temperature: 0.4,
-        };
-      } else {
-        endpoint = getModelEndpoint(targetModel, apiKey);
-        headers = { 'Content-Type': 'application/json' };
-        payload = {
-          contents: [
-            {
-              parts: [
-                {
-                  text: refinePrompt,
-              },
-            ],
-          },
-        ],
-      };
-      }
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
+      const textResponse = await makeModelAPICall({
+        modelId,
+        apiKey,
+        prompt: refinePrompt,
+        customModelId,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}: ${response.statusText}` } }));
-        const errorMessage = errorData.error?.message || `API request failed with status ${response.status}`;
-        throw new Error(`Model "${targetModel}": ${errorMessage}`);
-      }
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(`Model "${targetModel}": ${data.error.message}`);
-      }
-
-      let textResponse;
-      if (isOpenAI) {
-        if (!data.choices?.[0]?.message?.content) throw new Error('No refinement generated.');
-        textResponse = data.choices[0].message.content;
-      } else {
-        if (!data.candidates?.[0]?.content) throw new Error('No refinement generated.');
-        textResponse = data.candidates[0].content.parts[0].text;
-      }
       const htmlMatch = textResponse.match(/```html([\s\S]*?)```/);
 
       if (htmlMatch && htmlMatch[1]) {
