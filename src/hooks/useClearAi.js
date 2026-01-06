@@ -27,22 +27,34 @@ const ANALYSIS_PROMPT = `
      - R (Reward): Evaluate friction and user feedback.
   
   2. For each letter of the framework, provide:
+     - A status assessment: Evaluate the severity/quality and assign ONE of these statuses:
+       * "Critical Issue" - Major problems that significantly impact usability
+       * "Needs Improvement" - Issues that should be addressed but aren't critical
+       * "Pass" - Meets standards, minor or no issues
      - A detailed critique of the current design (e.g., • Friction: ..., • Feedback: ..., etc.)
      - At the end of each module, ALWAYS include: • Redesign Suggestion: [specific, actionable redesign recommendation for this module]
   
+  3. Provide an overall score:
+     - Calculate an overall UI health score as a percentage (0-100%)
+     - Base this on the severity and number of issues found across all C.L.E.A.R. modules
+     - Format: "Overall Score: XX%"
+  
   OUTPUT FORMAT:
+  - Start with: "Overall Score: XX%" (where XX is a number from 0-100)
   - Provide the C.L.E.A.R. analysis in Markdown format.
   - Use proper Markdown headers: ## C - Copywriting, ## L - Layout, ## E - Emphasis, ## A - Accessibility, ## R - Reward (use ## for level 2 headers, not ####)
   - Under EACH module section, include:
-    1. Detailed critique points as bullet points (e.g., • Clear Benefit: ..., • Friction: ..., • Feedback: ..., etc.)
-    2. At the end of EACH module, you MUST add: • Redesign Suggestion: [concrete, actionable redesign recommendation specifically for this C.L.E.A.R. module]
-  - CRITICAL: Every module (C, L, E, A, R) must end with a "• Redesign Suggestion:" bullet point. Do not skip this for any module.
+    1. Status line: "Status: [Critical Issue | Needs Improvement | Pass]" (on the first line after the header)
+    2. Detailed critique points as bullet points (e.g., • Clear Benefit: ..., • Friction: ..., • Feedback: ..., etc.)
+    3. At the end of EACH module, you MUST add: • Redesign Suggestion: [concrete, actionable redesign recommendation specifically for this C.L.E.A.R. module]
+  - CRITICAL: Every module (C, L, E, A, R) must have a Status line and end with a "• Redesign Suggestion:" bullet point. Do not skip this for any module.
   - Example format for R - Reward:
     ## R - Reward
+    Status: Pass
     • Friction: [analysis]
     • Feedback: [analysis]
     • Redesign Suggestion: [specific recommendation for Reward module]
-  - Apply this exact same format to ALL modules (C, L, E, A, R) - each must have its critique points followed by a Redesign Suggestion.
+  - Apply this exact same format to ALL modules (C, L, E, A, R) - each must have its status, critique points, and a Redesign Suggestion.
   - Do NOT include any HTML code in this response.
   - Do NOT create a separate "Redesign" section. All redesign suggestions must be under their respective C.L.E.A.R. modules.
 `;
@@ -73,8 +85,21 @@ const CODE_GENERATION_PROMPT = (analysisResult, userContext) => `
   - Do not include any markdown or explanations outside the code block.
 `;
 
-const MODEL_ENDPOINT = (modelId, apiKey) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+// Helper function to determine if a model is OpenAI
+const isOpenAIModel = (modelId) => {
+  return modelId.startsWith('gpt-') || modelId.startsWith('o1-') || modelId.startsWith('o3-');
+};
+
+// Helper function to get the appropriate API endpoint
+const getModelEndpoint = (modelId, apiKey) => {
+  if (isOpenAIModel(modelId)) {
+    return 'https://api.openai.com/v1/chat/completions';
+  }
+  return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+};
+
+// Legacy function for backward compatibility
+const MODEL_ENDPOINT = (modelId, apiKey) => getModelEndpoint(modelId, apiKey);
 
 async function fileToGenerativePart(file) {
   if (!file) {
@@ -137,41 +162,80 @@ export default function useClearAi() {
 
   const analyzeRound1 = async ({ apiKey, modelId, customModelId, imageFile, userContext }) => {
     console.log('[DEBUG] Round 1: Starting analysis...');
-    if (!apiKey) throw new Error('Please enter your Gemini API Key first.');
+    if (!apiKey) throw new Error('Please enter your API Key first.');
     if (!imageFile) throw new Error('Please upload an image to analyze.');
 
     const targetModel = modelId === 'custom' ? customModelId : modelId;
+    const isOpenAI = isOpenAIModel(targetModel);
     console.log('[DEBUG] Round 1: Setting isRound1Analyzing = true');
     setIsRound1Analyzing(true);
     setError(null);
 
     try {
-      const imagePart = await fileToGenerativePart(imageFile);
       let fullPrompt = ANALYSIS_PROMPT;
       if (userContext?.trim()) {
         fullPrompt += `\n\nADDITIONAL CONTEXT FROM USER:\n"${userContext.trim()}"\n\nPlease incorporate this context into your analysis.`;
       }
 
-      const payload = {
-        contents: [{ parts: [{ text: fullPrompt }, imagePart] }],
-        generationConfig: {
+      let payload;
+      let headers;
+      let endpoint;
+
+      if (isOpenAI) {
+        const imageUrl = await fileToOpenAIImageUrl(imageFile);
+        endpoint = getModelEndpoint(targetModel, apiKey);
+        headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        };
+        payload = {
+          model: targetModel,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: fullPrompt },
+                {
+                  type: 'image_url',
+                  image_url: { url: imageUrl },
+                },
+              ],
+            },
+          ],
+          max_tokens: 8192,
           temperature: 0.4,
-          maxOutputTokens: 8192,
-        },
-      };
+        };
+      } else {
+        const imagePart = await fileToGenerativePart(imageFile);
+        endpoint = getModelEndpoint(targetModel, apiKey);
+        headers = { 'Content-Type': 'application/json' };
+        payload = {
+          contents: [{ parts: [{ text: fullPrompt }, imagePart] }],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 8192,
+          },
+        };
+      }
 
       console.log('[DEBUG] Round 1: Sending API request...');
-      const response = await fetch(MODEL_ENDPOINT(targetModel, apiKey), {
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
       const data = await response.json();
       if (data.error) throw new Error(data.error.message);
-      if (!data.candidates?.[0]?.content) throw new Error('No analysis generated.');
-
-      const analysisText = data.candidates[0].content.parts[0].text;
+      
+      let analysisText;
+      if (isOpenAI) {
+        if (!data.choices?.[0]?.message?.content) throw new Error('No analysis generated.');
+        analysisText = data.choices[0].message.content;
+      } else {
+        if (!data.candidates?.[0]?.content) throw new Error('No analysis generated.');
+        analysisText = data.candidates[0].content.parts[0].text;
+      }
       console.log('[DEBUG] Round 1: Received analysis response, length:', analysisText.length);
       console.log('[DEBUG] Round 1: Calling setRound1Analysis...');
       setRound1Analysis(analysisText);
@@ -191,10 +255,11 @@ export default function useClearAi() {
 
   const generateCodeRound2 = async ({ apiKey, modelId, customModelId, analysisResult, userContext }) => {
     console.log('[DEBUG] Round 2: Starting code generation...');
-    if (!apiKey) throw new Error('Please enter your Gemini API Key first.');
+    if (!apiKey) throw new Error('Please enter your API Key first.');
     if (!analysisResult) throw new Error('Analysis result is required for code generation.');
 
     const targetModel = modelId === 'custom' ? customModelId : modelId;
+    const isOpenAI = isOpenAIModel(targetModel);
     console.log('[DEBUG] Round 2: Setting isRound2Generating = true');
     setIsRound2Generating(true);
     setError(null);
@@ -202,26 +267,57 @@ export default function useClearAi() {
     try {
       const fullPrompt = CODE_GENERATION_PROMPT(analysisResult, userContext);
 
-      const payload = {
-        contents: [{ parts: [{ text: fullPrompt }] }],
-        generationConfig: {
+      let payload;
+      let headers;
+      let endpoint;
+
+      if (isOpenAI) {
+        endpoint = getModelEndpoint(targetModel, apiKey);
+        headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        };
+        payload = {
+          model: targetModel,
+          messages: [
+            {
+              role: 'user',
+              content: fullPrompt,
+            },
+          ],
+          max_tokens: 8192,
           temperature: 0.4,
-          maxOutputTokens: 8192,
-        },
-      };
+        };
+      } else {
+        endpoint = getModelEndpoint(targetModel, apiKey);
+        headers = { 'Content-Type': 'application/json' };
+        payload = {
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          generationConfig: {
+            temperature: 0.4,
+            maxOutputTokens: 8192,
+          },
+        };
+      }
 
       console.log('[DEBUG] Round 2: Sending API request...');
-      const response = await fetch(MODEL_ENDPOINT(targetModel, apiKey), {
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
       const data = await response.json();
       if (data.error) throw new Error(data.error.message);
-      if (!data.candidates?.[0]?.content) throw new Error('No code generated.');
-
-      const textResponse = data.candidates[0].content.parts[0].text;
+      
+      let textResponse;
+      if (isOpenAI) {
+        if (!data.choices?.[0]?.message?.content) throw new Error('No code generated.');
+        textResponse = data.choices[0].message.content;
+      } else {
+        if (!data.candidates?.[0]?.content) throw new Error('No code generated.');
+        textResponse = data.candidates[0].content.parts[0].text;
+      }
       console.log('[DEBUG] Round 2: Received code response, length:', textResponse.length);
       const htmlMatch = textResponse.match(/```html([\s\S]*?)```/);
       
@@ -251,7 +347,7 @@ export default function useClearAi() {
 
   const analyze = async ({ apiKey, modelId, customModelId, imageFile, userContext }) => {
     console.log('[DEBUG] analyze(): Starting...');
-    if (!apiKey) return setError('Please enter your Gemini API Key first.');
+    if (!apiKey) return setError('Please enter your API Key first.');
     if (!imageFile) return setError('Please upload an image to analyze.');
 
     console.log('[DEBUG] analyze(): Setting isAnalyzing = true');
@@ -360,7 +456,7 @@ export default function useClearAi() {
 
   const retryCodeGeneration = async ({ apiKey, modelId, customModelId, userContext }) => {
     // Retry Round 2 code generation using existing analysis
-    if (!apiKey) return setError('Please enter your Gemini API Key first.');
+    if (!apiKey) return setError('Please enter your API Key first.');
     if (!round1Analysis && !analysisResult) {
       return setError('No analysis available. Please run analysis first.');
     }
@@ -389,16 +485,12 @@ export default function useClearAi() {
     if (!apiKey || !generatedCode || !prompt?.trim()) return;
 
     const targetModel = modelId === 'custom' ? customModelId : modelId;
+    const isOpenAI = isOpenAIModel(targetModel);
     setIsRefining(true);
     setError(null);
 
     try {
-      const payload = {
-        contents: [
-          {
-            parts: [
-              {
-                text: `You are a frontend developer refining a UI.
+      const refinePrompt = `You are a frontend developer refining a UI.
                 
                 CURRENT HTML CODE:
                 ${generatedCode}
@@ -408,23 +500,62 @@ export default function useClearAi() {
                 
                 TASK:
                 Update the HTML code to satisfy the user request.
-                Return ONLY the raw HTML code wrapped in \`\`\`html ... \`\`\`. Do not include markdown or explanations outside the code block.`,
-              },
-            ],
-          },
-        ],
-      };
+                Return ONLY the raw HTML code wrapped in \`\`\`html ... \`\`\`. Do not include markdown or explanations outside the code block.`;
 
-      const response = await fetch(MODEL_ENDPOINT(targetModel, apiKey), {
+      let payload;
+      let headers;
+      let endpoint;
+
+      if (isOpenAI) {
+        endpoint = getModelEndpoint(targetModel, apiKey);
+        headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        };
+        payload = {
+          model: targetModel,
+          messages: [
+            {
+              role: 'user',
+              content: refinePrompt,
+            },
+          ],
+          max_tokens: 8192,
+          temperature: 0.4,
+        };
+      } else {
+        endpoint = getModelEndpoint(targetModel, apiKey);
+        headers = { 'Content-Type': 'application/json' };
+        payload = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: refinePrompt,
+                },
+              ],
+            },
+          ],
+        };
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
       const data = await response.json();
       if (data.error) throw new Error(data.error.message);
 
-      const textResponse = data.candidates[0].content.parts[0].text;
+      let textResponse;
+      if (isOpenAI) {
+        if (!data.choices?.[0]?.message?.content) throw new Error('No refinement generated.');
+        textResponse = data.choices[0].message.content;
+      } else {
+        if (!data.candidates?.[0]?.content) throw new Error('No refinement generated.');
+        textResponse = data.candidates[0].content.parts[0].text;
+      }
       const htmlMatch = textResponse.match(/```html([\s\S]*?)```/);
 
       if (htmlMatch && htmlMatch[1]) {
