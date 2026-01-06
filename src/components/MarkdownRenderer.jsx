@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Lightbulb } from 'lucide-react';
 
 function formatInlineStyles(text) {
@@ -25,17 +25,10 @@ function formatInlineStyles(text) {
   });
 }
 
-export default function MarkdownRenderer({ content }) {
+export default function MarkdownRenderer({ content, onOverallScoreChange }) {
   if (!content) return null;
 
   const lines = content.split('\n');
-  
-  // Extract overall score from the beginning
-  let overallScore = null;
-  const scoreMatch = content.match(/Overall\s+Score:\s*(\d+)%/i);
-  if (scoreMatch) {
-    overallScore = parseInt(scoreMatch[1], 10);
-  }
 
   const modules = [];
   let currentModule = null;
@@ -47,32 +40,36 @@ export default function MarkdownRenderer({ content }) {
     return trimmed.match(/^##\s+[CLEAR]\s+-/);
   };
   
-  // Helper function to parse status from a line
-  const parseStatus = (line) => {
+  // Helper function to parse module score from a line
+  const parseModuleScore = (line) => {
     const trimmed = line.trim();
-    const statusMatch = trimmed.match(/Status:\s*(Critical Issue|Needs Improvement|Pass)/i);
-    if (statusMatch) {
-      return statusMatch[1];
+    // Match "Score: XX/20" or "Score: XX"
+    const scoreMatch = trimmed.match(/Score:\s*(\d+)(?:\/20)?/i);
+    if (scoreMatch) {
+      const score = parseInt(scoreMatch[1], 10);
+      // Ensure score is between 0-20
+      return Math.max(0, Math.min(20, score));
     }
     return null;
   };
 
+  // Helper function to calculate status from score
+  const calculateStatusFromScore = (score) => {
+    if (score === null || score === undefined) {
+      return { dot: 'bg-slate-500', text: 'text-slate-700', label: 'Unknown' };
+    }
+    
+    if (score >= 18) {
+      return { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Pass' };
+    } else if (score >= 10) {
+      return { dot: 'bg-amber-500', text: 'text-amber-700', label: 'Needs Improvement' };
+    } else {
+      return { dot: 'bg-red-500', text: 'text-red-700', label: 'Critical Issue' };
+    }
+  };
+
   // Helper function to get module color and badge info
-  const getModuleInfo = (moduleName, statusLabel = null) => {
-    // Map status label to colors
-    const getStatusColors = (status) => {
-      if (!status) return { dot: 'bg-slate-500', text: 'text-slate-700', label: 'Unknown' };
-      
-      const statusLower = status.toLowerCase();
-      if (statusLower.includes('critical')) {
-        return { dot: 'bg-red-500', text: 'text-red-700', label: 'Critical Issue' };
-      } else if (statusLower.includes('improvement') || statusLower.includes('needs')) {
-        return { dot: 'bg-amber-500', text: 'text-amber-700', label: 'Needs Improvement' };
-      } else if (statusLower.includes('pass')) {
-        return { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Pass' };
-      }
-      return { dot: 'bg-slate-500', text: 'text-slate-700', label: status };
-    };
+  const getModuleInfo = (moduleName, score = null) => {
 
     const moduleInfo = {
       'C': { 
@@ -122,27 +119,31 @@ export default function MarkdownRenderer({ content }) {
     
     return {
       ...baseInfo,
-      status: getStatusColors(statusLabel)
+      status: calculateStatusFromScore(score)
     };
   };
 
-  // Group lines into modules and extract status
+  // Group lines into modules and extract score
   lines.forEach((line, index) => {
     if (isModuleHeader(line)) {
       // Save previous module if exists
       if (currentModule) {
-        modules.push({ header: currentModule.header, lines: currentModuleLines, status: currentModule.status });
+        modules.push({ 
+          header: currentModule.header, 
+          lines: currentModuleLines, 
+          score: currentModule.score 
+        });
       }
       // Start new module
-      currentModule = { header: line, status: null };
+      currentModule = { header: line, score: null };
       currentModuleLines = [];
     } else {
-      // Check if this line contains status
-      if (currentModule && !currentModule.status) {
-        const status = parseStatus(line);
-        if (status) {
-          currentModule.status = status;
-          // Don't include status line in content
+      // Check if this line contains score (first line after header)
+      if (currentModule && currentModule.score === null) {
+        const score = parseModuleScore(line);
+        if (score !== null) {
+          currentModule.score = score;
+          // Don't include score line in content
           return;
         }
       }
@@ -152,8 +153,26 @@ export default function MarkdownRenderer({ content }) {
 
   // Don't forget the last module
   if (currentModule) {
-    modules.push({ header: currentModule.header, lines: currentModuleLines, status: currentModule.status });
+    modules.push({ 
+      header: currentModule.header, 
+      lines: currentModuleLines, 
+      score: currentModule.score 
+    });
   }
+
+  // Calculate overall score from module scores
+  let overallScore = null;
+  const moduleScores = modules.map(m => m.score).filter(s => s !== null);
+  if (moduleScores.length === 5) {
+    overallScore = moduleScores.reduce((sum, score) => sum + score, 0);
+  }
+
+  // Notify parent component of overall score change
+  useEffect(() => {
+    if (onOverallScoreChange && overallScore !== null) {
+      onOverallScoreChange(overallScore);
+    }
+  }, [overallScore, onOverallScoreChange]);
 
   // If no modules found, render normally
   if (modules.length === 0) {
@@ -196,10 +215,10 @@ export default function MarkdownRenderer({ content }) {
   }
 
   // Render modules as distinct regions with collapsible functionality
-  return <ModuleRenderer modules={modules} getModuleInfo={getModuleInfo} formatInlineStyles={formatInlineStyles} overallScore={overallScore} parseStatus={parseStatus} />;
+  return <ModuleRenderer modules={modules} getModuleInfo={getModuleInfo} formatInlineStyles={formatInlineStyles} overallScore={overallScore} />;
 }
 
-function ModuleRenderer({ modules, getModuleInfo, formatInlineStyles, overallScore, parseStatus }) {
+function ModuleRenderer({ modules, getModuleInfo, formatInlineStyles, overallScore }) {
   // Only first module is expanded by default
   const [expandedModules, setExpandedModules] = useState(new Set([0]));
 
@@ -303,7 +322,7 @@ function ModuleRenderer({ modules, getModuleInfo, formatInlineStyles, overallSco
   return (
     <div className="space-y-3">
       {modules.map((module, moduleIndex) => {
-        const moduleInfo = getModuleInfo(module.header, module.status);
+        const moduleInfo = getModuleInfo(module.header, module.score);
         const isExpanded = expandedModules.has(moduleIndex);
         const parsedContent = parseModuleContent(module.lines);
 
@@ -327,6 +346,14 @@ function ModuleRenderer({ modules, getModuleInfo, formatInlineStyles, overallSco
                     <span className={`text-xs font-medium ${moduleInfo.status.text} uppercase tracking-wide`}>
                       {moduleInfo.status.label}
                     </span>
+                    {module.score !== null && (
+                      <>
+                        <span className="text-xs text-slate-400 mx-1">•</span>
+                        <span className="text-xs font-semibold text-slate-600">
+                          {module.score}/20
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -28,24 +28,18 @@ const ANALYSIS_PROMPT = `
      - R (Reward): Evaluate friction and user feedback.
   
   2. For each letter of the framework, provide:
-     - A status assessment: Evaluate the severity/quality and assign ONE of these statuses:
-       * "Critical Issue" - Major problems that significantly impact usability
-       * "Needs Improvement" - Issues that should be addressed but aren't critical
-       * "Pass" - Meets standards, minor or no issues
+     - A module score: Assign a score from 0-20 for this module based on the quality and issues found
+       * 0-9: Critical issues, major problems
+       * 10-17: Needs improvement, moderate issues
+       * 18-20: Pass, meets standards with minor or no issues
      - A detailed critique of the current design (e.g., • Friction: ..., • Feedback: ..., etc.)
      - At the end of each module, ALWAYS include: • Redesign Suggestion: [specific, actionable redesign recommendation for this module]
   
-  3. Provide an overall score:
-     - Calculate an overall UI health score as a percentage (0-100%)
-     - Base this on the severity and number of issues found across all C.L.E.A.R. modules
-     - Format: "Overall Score: XX%"
-  
   OUTPUT FORMAT:
-  - Start with: "Overall Score: XX%" (where XX is a number from 0-100)
   - Provide the C.L.E.A.R. analysis in Markdown format using ## headers (not ####)
   - For EACH module (C, L, E, A, R), follow this structure:
     1. Module header: ## C - Copywriting (or L - Layout, E - Emphasis, A - Accessibility, R - Reward)
-    2. Status line (first line after header): "Status: [Critical Issue | Needs Improvement | Pass]"
+    2. Score line (first line after header): "Score: XX/20" (where XX is a number from 0-20)
     3. Critique bullet points with BOLD labels and detailed analysis:
        - Format: • **Label:** [comprehensive analysis explaining the issue, observation, or finding]
        - Each bullet must use bold markdown (**text**) for the label, followed by a colon and detailed analysis
@@ -56,8 +50,9 @@ const ANALYSIS_PROMPT = `
          * A - Accessibility: **Contrast:**, **Touch Targets:**, **Readability:**, **Color Blindness:**, etc.
          * R - Reward: **Friction:**, **Feedback:**, **User Delight:**, etc.
     4. Final bullet point: • **Redesign Suggestion:** [concrete, actionable recommendation for this specific module]
-  - CRITICAL: Every module must include Status, critique points with bold labels, and a Redesign Suggestion. Do not skip any module.
+  - CRITICAL: Every module must include Score (0-20), critique points with bold labels, and a Redesign Suggestion. Do not skip any module.
   - Do NOT include HTML code or create a separate "Redesign" section. All redesign suggestions belong under their respective C.L.E.A.R. modules.
+  - Do NOT provide an overall score. The overall score will be calculated as the sum of all five module scores (0-100).
 `;
 
 const CODE_GENERATION_PROMPT = (analysisResult, userContext) => `
