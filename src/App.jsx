@@ -183,7 +183,7 @@ export default function App() {
             generatedCode={generatedCode}
             activeTab={activeTab}
             onTabChange={setActiveTab}
-            isAnalyzing={isRound2Generating}
+            isAnalyzing={isRound1Analyzing || isRound2Generating}
           />
 
           <RefinementBar
