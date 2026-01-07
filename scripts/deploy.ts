@@ -20,7 +20,7 @@ const run = (cmd: string) => {
 };
 
 const main = () => {
-  run('npm run build');
+  // Build happens inside Docker, no need to build locally
   try {
     run(`gcloud config set project ${config.project}`);
     run(`gcloud builds submit --tag ${config.image} --quiet`);
