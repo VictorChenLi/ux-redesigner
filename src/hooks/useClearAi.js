@@ -42,7 +42,30 @@ const ANALYSIS_PROMPT = `
       - [Hint: There's more...] When content overflows, is there a clear visual hint? Are key actions hidden or require discovery? Do users know there's more content available (scroll indicators, pagination, "show more" buttons)?
       - [Low risk of mistakes] Are destructive or high-stakes actions separated from frequent ones, clearly labeled, and confirmed when needed? Could a tired, distracted, one-handed person still see what to do, hit the right target, and feel confident using this screen without accidentally triggering unwanted actions?
       - [Imagine the worst conditions...] Could a tired, distracted, one-handed person still see what to do, hit the right target, and feel confident using this screen? Consider reduced cognitive load, physical limitations, and environmental factors (low light, motion, fatigue). This comprehensive check covers patterns, knowledge assumptions, and overall usability under challenging conditions.
-     - R (Reward): Evaluate friction and user feedback.
+    - R (Reward): Evaluate the emotional outcome and reward design using the Reward Trifecta (Control, Competence, Recognition) and apply reward principles.
+      - [Reward Type Identification] What type of reward does this screen need? Identify the primary reward type based on user context and screen goal:
+        * Control (Safety, Certainty, Agency): For moments requiring reduced uncertainty, risk reduction, or sense of agency (checkout, waiting, high-stakes actions, recovery from errors)
+        * Competence (Completion, Progress, Mastery): For moments requiring evidence of effectiveness, progress, or improvement (task completion, multi-step flows, performance feedback, after friction)
+        * Recognition (Acknowledgment, Belonging, Reciprocity): For moments requiring social acknowledgment or validation (after outcomes, social surfaces, group spaces, collaboration loops)
+      - [Control Subcategories] If Control is needed, evaluate:
+        * Safety: Are there reassurance cues (protection, privacy, fraud prevention, guarantees)?
+        * Certainty: Is the current state and likely outcome clear (status, ETAs, confirmations, "what's happening now" + "what happens next")?
+        * Agency: Is there perceived ability to influence events (undo/cancel/edit, preferences, controls, branching choices)?
+      - [Competence Subcategories] If Competence is needed, evaluate:
+        * Completion: Is there clear evidence that a task or step is finished ("Done" states, checkmarks, receipts, confirmations)?
+        * Progress: Is there evidence of moving forward toward a goal (milestones, progress bars, streaks, level/step indicators)?
+        * Mastery: Are there signals of getting better, faster, or more accurate (tips, personal bests, quality scores)?
+      - [Recognition Subcategories] If Recognition is needed, evaluate:
+        * Acknowledgment: Is there explicit feedback that the action "counts" socially (praise, badges, credentials, "verified", shareable proof)?
+        * Belonging: Are there cues of being part of a group or shared identity (teams/spaces, roles, member status, cohort markers)?
+        * Reciprocity: Are there signals that another person saw and responded (replies, reactions, accepts/approvals, comments, "seen")?
+      - [Meaningful Moment] Did the user just do something meaningful? Reserve special treatment (beyond basic feedback) for important moments like completing a task or milestone. Is the reward reserved for meaningful actions, or is it overused for trivial interactions?
+      - [Emotional Alignment] What should they feel here: safe, progressing, or recognized? Does the UI deliver the right emotional outcome for this moment? Match the dominant emotion (anxiety → Control, effort → Competence, pride → Recognition).
+      - [Clear Feedback] Is it 100% clear that the action worked? Before adding delight, make sure there's obvious, fast feedback like a state change, message, or checkmark. Can users immediately see that their action was successful?
+      - [Proportional Reward] Is the reward proportional to the moment? A huge celebration for a tiny, frequent action will feel silly or tiring; save bigger moments for bigger wins. Does the intensity match the importance of the action?
+      - [Repetition Tolerance] Will this still feel good the 10th time? Imagine a power user repeating the flow; if the reward becomes annoying, tone it down or vary it. Does the reward maintain its effectiveness with repeated use?
+      - [Healthy Habits] Does this nudge a healthy, user-aligned habit? Make sure the reward encourages behavior that helps the user, not just short-term metrics. Is the reward aligned with user goals and long-term value?
+      - [Concrete Evidence] Is the reward concrete and meaningful? Use concrete evidence: what happened, what it means, what they gained. Avoid generic praise with no real meaning, evidence, or consequence. Surface the payoff explicitly (e.g., "Saved 1 hour", "Delivered today", "Share credential").    
   
   2. For each letter of the framework, provide:
      - A module score: Assign a score from 0-20 for this module based on the quality and issues found
@@ -50,7 +73,7 @@ const ANALYSIS_PROMPT = `
        * 10-17: Needs improvement, moderate issues
        * 18-20: Pass, meets standards with minor or no issues
      - A detailed critique of the current design (e.g., • Friction: ..., • Feedback: ..., etc.)
-     - At the end of each module, ALWAYS include: • Redesign Suggestion: [specific, actionable redesign recommendation for this module]
+     - At the end of each module, ALWAYS include: • Redesign Suggestion: [specific, what should be kept, what should be removed, what should be added, actionable redesign recommendation for this module]
   
   OUTPUT FORMAT:
   - Provide the C.L.E.A.R. analysis in Markdown format using ## headers (not ####)
@@ -66,7 +89,7 @@ const ANALYSIS_PROMPT = `
          * L - Layout: **Proximity:**, **Similarity:**, **Alignment:**, **Common Region:**, **Continuity:**, **Simplicity:**, **Clear Zones:**
          * E - Emphasis: **Focal Point:**, **Size:**, **Color:**, **Space:**, **Placement:**, **Visualization:**, **Motion:**, **Blur Test:**, **Visual Competition:**
          * A - Accessibility: **Visible without searching:**, **Operable without precision:**, **Actionable without guessing:**, **Sufficient contrast:**, **Not only color:**, **Hint: There's more...:**, **Low risk of mistakes:**, **Imagine the worst conditions...:**
-         * R - Reward: **Friction:**, **Feedback:**, **User Delight:**, etc.
+         * R - Reward: **Reward Type Identification:**, **Meaningful Moment:**, **Emotional Alignment:**, **Clear Feedback:**, **Proportional Reward:**, **Repetition Tolerance:**, **Healthy Habits:**, **Concrete Evidence:**, **Control Subcategories:**, **Competence Subcategories:**, **Recognition Subcategories:**
     4. Final bullet point: • **Redesign Suggestion:** [concrete, actionable recommendation for this specific module]
   - CRITICAL: Every module must include Score (0-20), critique points with bold labels (only for aspects with issues or observations), and a Redesign Suggestion. Do not skip any module. Only include critique points where there are actual issues or noteworthy findings to report.
   - Do NOT include HTML code or create a separate "Redesign" section. All redesign suggestions belong under their respective C.L.E.A.R. modules.
