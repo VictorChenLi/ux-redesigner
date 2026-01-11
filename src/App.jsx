@@ -159,8 +159,8 @@ export default function App() {
         onApiKeyChange={setApiKey}
       />
 
-      <main className="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-5 space-y-6 flex flex-col h-[calc(100vh-8rem)]">
+      <main className="flex-grow max-w-[1800px] w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 space-y-6 flex flex-col h-[calc(100vh-8rem)]">
           <UploadCard
             imagePreview={imagePreview}
             onUpload={handleImageUpload}
@@ -178,7 +178,7 @@ export default function App() {
           />
         </div>
 
-        <div className="lg:col-span-7 flex flex-col h-[calc(100vh-8rem)] space-y-4">
+        <div className="lg:col-span-8 flex flex-col h-[calc(100vh-8rem)] space-y-4">
           <PreviewPanel
             generatedCode={generatedCode}
             activeTab={activeTab}

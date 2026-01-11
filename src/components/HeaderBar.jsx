@@ -14,9 +14,6 @@ const getModelDisplayName = (modelId, customModelId) => {
     'gemini-3-pro-preview': 'Gemini 3 Pro',
     'gpt-5.2': 'GPT-5.2',
     'gpt-5.1': 'GPT-5.1',
-    'gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
-    'gpt-5.1-codex-mini': 'GPT-5.1 Codex Mini',
-    'gpt-5-nano': 'GPT-5 Nano',
   };
   
   return modelNames[modelId] || modelId;
@@ -33,7 +30,7 @@ export default function HeaderBar({
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-20">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-[1800px] mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
             C
