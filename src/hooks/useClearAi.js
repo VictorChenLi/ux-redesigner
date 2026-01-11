@@ -23,8 +23,25 @@ const ANALYSIS_PROMPT = `
       - [Continuity] Is the scan path smooth (no zig-zag)? Top-left → bottom?
       - [Simplicity] Can you remove styling/variants and keep clarity?
       - [Clear Zones] Can you distinguish header/main/sidebar/footer at a glance?
-     - E (Emphasis): Evaluate visual hierarchy and focal points.
-     - A (Accessibility): Evaluate contrast, touch targets, and readability.
+    - E (Emphasis): Evaluate visual hierarchy and focal points using the 6 emphasis dials (Size, Color, Space, Placement, Visualization, Motion).
+      - [Focal Point] What's the first thing your eye hits? Does that focal point match the screen's main goal? The thing that pops first should be the key action or message, not a logo or random button.
+      - [Size] Are primary actions noticeably larger than secondary ones? Make the primary message/action noticeably larger than its neighbors. Turn down surrounding elements so the "hero" doesn't have to do all the work.
+      - [Color] Do primary actions clearly stand out from secondary ones using accent color? Use accent color to make key actions grab attention. Use color to highlight important information (status, warnings, success). Use muted color to demote secondary details so they don't compete.
+      - [Space] Is whitespace helping key elements stand out? Add breathing room around the primary element to make it stand out. Buy space by shrinking or removing secondary stuff (logos, helper text, extras). Keep related elements close while isolating the group.
+      - [Placement] Is the primary message/action in "prime real estate" (top/first scan)? Use top/first scan for the primary message or status. Match the context: urgency changes what people look for first. Place the action close to the decision moment (near the info that justifies it).
+      - [Visualization] Are visuals used to show meaning at-a-glance? Turn abstract text into a visual pattern (progress bar, chart, illustration, icon). Prefer "at-a-glance" meaning over paragraphs people must read. Use the familiar pattern that matches the message.
+      - [Motion] Does motion reinforce the screen's goal without being distracting? Use motion to reinforce the screen's goal (guide attention, confirm change, show progress). Avoid "eye candy": motion without purpose is wasted attention. Keep it subtle and focused on the main insight.
+      - [Blur Test] Does the blur test highlight the right elements? Squint or blur the screen; only the truly important elements should still stand out in the fog.
+      - [Visual Competition] Are only a few things "shouting"? If everything is bold, colorful, or large, nothing feels important; dial down styling on supporting pieces. Is any decoration stealing attention from what matters? Icons, illustrations, or backgrounds should support the main goal, not compete with it.
+    - A (Accessibility): Evaluate accessibility using the 3 accessibility principles (Visible without searching, Operable without precision, Actionable without guessing) and check for common mistakes.
+      - [Visible without searching] Is the main action or key message visible without opening menus, scrolling, or closing popups/overlays? Can you see what to do immediately without searching or guessing?
+      - [Operable without precision] Are primary actions large enough and spaced so you can tap/click them without hitting another element by mistake? Are touch targets large enough (minimum 44x44px) and adequately spaced to avoid accidental taps, especially for users with reduced dexterity (thumb, motion, fatigue)?
+      - [Actionable without guessing] Do buttons, links, and controls clearly look tappable (shape, style, microcopy) so people don't have to guess what's interactive? Do actions look like actions with proper visual affordances (hover states, focus indicators)?
+      - [Sufficient contrast] Does important text (and icons) have enough contrast with the background to remain readable in low light or without perfect vision? Check that text meets WCAG contrast requirements (AA: 4.5:1 for normal text, 3:1 for large text).
+      - [Not only color] If you remove color, can people still understand status, categories, or chart values thanks to labels, icons, or patterns? Does the interface rely solely on color to convey meaning? For color-blind users, ensure information is communicated through multiple channels (color + text, color + icon, color + pattern).
+      - [Hint: There's more...] When content overflows, is there a clear visual hint? Are key actions hidden or require discovery? Do users know there's more content available (scroll indicators, pagination, "show more" buttons)?
+      - [Low risk of mistakes] Are destructive or high-stakes actions separated from frequent ones, clearly labeled, and confirmed when needed? Could a tired, distracted, one-handed person still see what to do, hit the right target, and feel confident using this screen without accidentally triggering unwanted actions?
+      - [Imagine the worst conditions...] Could a tired, distracted, one-handed person still see what to do, hit the right target, and feel confident using this screen? Consider reduced cognitive load, physical limitations, and environmental factors (low light, motion, fatigue). This comprehensive check covers patterns, knowledge assumptions, and overall usability under challenging conditions.
      - R (Reward): Evaluate friction and user feedback.
   
   2. For each letter of the framework, provide:
@@ -43,14 +60,15 @@ const ANALYSIS_PROMPT = `
     3. Critique bullet points with BOLD labels and detailed analysis:
        - Format: • **Label:** [comprehensive analysis explaining the issue, observation, or finding]
        - Each bullet must use bold markdown (**text**) for the label, followed by a colon and detailed analysis
-       - Module-specific labels:
+       - IMPORTANT: Only include critique points for evaluation aspects where there are issues, problems, or noteworthy observations. Do NOT include critique points for aspects that are working well or have no issues. Focus on what needs improvement or what stands out (positively or negatively).
+       - Module-specific critique points' labels (use only when there are issues or observations to report):
          * C - Copywriting: **Clear Benefit:**, **Concise Copy:**, **Concrete Claims:**, **Action Labels:**, **Risk Reassure:**, **Remove Fluff:**, **Human Voice:**
          * L - Layout: **Proximity:**, **Similarity:**, **Alignment:**, **Common Region:**, **Continuity:**, **Simplicity:**, **Clear Zones:**
-         * E - Emphasis: **Focal Point:**, **Hierarchy:**, **Visual Weight:**, etc.
-         * A - Accessibility: **Contrast:**, **Touch Targets:**, **Readability:**, **Color Blindness:**, etc.
+         * E - Emphasis: **Focal Point:**, **Size:**, **Color:**, **Space:**, **Placement:**, **Visualization:**, **Motion:**, **Blur Test:**, **Visual Competition:**
+         * A - Accessibility: **Visible without searching:**, **Operable without precision:**, **Actionable without guessing:**, **Sufficient contrast:**, **Not only color:**, **Hint: There's more...:**, **Low risk of mistakes:**, **Imagine the worst conditions...:**
          * R - Reward: **Friction:**, **Feedback:**, **User Delight:**, etc.
     4. Final bullet point: • **Redesign Suggestion:** [concrete, actionable recommendation for this specific module]
-  - CRITICAL: Every module must include Score (0-20), critique points with bold labels, and a Redesign Suggestion. Do not skip any module.
+  - CRITICAL: Every module must include Score (0-20), critique points with bold labels (only for aspects with issues or observations), and a Redesign Suggestion. Do not skip any module. Only include critique points where there are actual issues or noteworthy findings to report.
   - Do NOT include HTML code or create a separate "Redesign" section. All redesign suggestions belong under their respective C.L.E.A.R. modules.
   - Do NOT provide an overall score. The overall score will be calculated as the sum of all five module scores (0-100).
 `;
