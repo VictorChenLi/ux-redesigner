@@ -11,4 +11,5 @@ Logic references for this project. Add new logic notes below with links to detai
 - 2026-01-06: Per-module scoring system (0-20) with calculated status - each C.L.E.A.R. module receives a score from 0-20, status is automatically calculated from score (18-20: Pass, 10-17: Needs Improvement, 0-9: Critical Issue), overall score is sum of all 5 modules (0-100) (`context/scoring-system.md`)
 - 2026-01-06: Refactored model-specific API logic into separate utility module - extracted model detection, API payload creation, and response parsing into `src/utils/modelHandlers.js` for better code organization and maintainability (`context/multi-provider-support.md`)
 - 2026-01-06: Analysis export and preview features - added copy markdown button, launch preview page button (opens styled HTML in new tab), and PDF download functionality in preview page (`context/analysis-export-features.md`)
+- 2026-01-06: Multiple AI model selection and popout implementation - supports multiple AI providers (Gemini, OpenAI) with per-model API key storage, custom model support, unified API handler, and settings modal popout (`context/multiple-ai-model-selection-popout.md`)
 
